@@ -6,7 +6,7 @@
  * - HTTP für statische Dateien
  */
 
-const { NFC }    = require('nfc-pcsc');
+// const { NFC }    = require('nfc-pcsc');
 const WebSocket  = require('ws');
 const http       = require('http');
 const fs         = require('fs');
@@ -117,7 +117,7 @@ function normalizeOrder(row) {
 // ─── HTTP-Server (statische Dateien) ──────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
   console.log('HTTP request:', req.url);
-  
+
   const safePath = req.url === '/' ? '/index.html' : req.url;
   const filePath = path.join(__dirname, safePath);
 
@@ -288,22 +288,22 @@ function detachNFC() {
 function startPolling() {
   if (nfcPolling) return;
   console.log('🔄 Warte auf NFC-Lesegerät (prüfe alle 3 s) …');
-  nfcPolling = setInterval(() => {
-    if (!nfcInstance) attachNFC();
-  }, 3000);
+  // nfcPolling = setInterval(() => {
+  //   if (!nfcInstance) attachNFC();
+  // }, 3000);
 }
   
-httpServer.listen(PORT, () => {
-  console.log(`\n🍺 NFC Kassensystem läuft`);
-  console.log(`   → http://localhost:${PORT}`);
-  console.log(`   → Datenbank: /home/jerry/kassensystem/bar.db\n`);
+// httpServer.listen(PORT, () => {
+//   console.log(`\n🍺 NFC Kassensystem läuft`);
+//   console.log(`   → http://localhost:${PORT}`);
+//   console.log(`   → Datenbank: /home/jerry/kassensystem/bar.db\n`);
 
-  setImmediate(() => {
-    try {
-      attachNFC();
-      if (!nfcInstance) startPolling();
-    } catch (err) {
-      console.error('NFC init failed:', err);
-    }
-  });
-});
+//   setImmediate(() => {
+//     try {
+//       attachNFC();
+//       if (!nfcInstance) startPolling();
+//     } catch (err) {
+//       console.error('NFC init failed:', err);
+//     }
+//   });
+// });
