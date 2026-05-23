@@ -116,6 +116,8 @@ function normalizeOrder(row) {
 
 // ─── HTTP-Server (statische Dateien) ──────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
+  console.log('HTTP request:', req.url);
+  
   const safePath = req.url === '/' ? '/index.html' : req.url;
   const filePath = path.join(__dirname, safePath);
 
@@ -290,14 +292,18 @@ function startPolling() {
     if (!nfcInstance) attachNFC();
   }, 3000);
 }
-
+  
 httpServer.listen(PORT, () => {
   console.log(`\n🍺 NFC Kassensystem läuft`);
   console.log(`   → http://localhost:${PORT}`);
   console.log(`   → Datenbank: /home/jerry/kassensystem/bar.db\n`);
 
-  setTimeout(() => {
-    attachNFC();
-    if (!nfcInstance) startPolling();
-  }, 500);
+  setImmediate(() => {
+    try {
+      attachNFC();
+      if (!nfcInstance) startPolling();
+    } catch (err) {
+      console.error('NFC init failed:', err);
+    }
+  });
 });
