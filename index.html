@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KlangKo Bar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:        #0d0c0a;
+    --surface:   #161410;
+    --card:      #1e1b16;
+    --border:    #2e2a22;
+    --gold:      #c9a84c;
+    --gold-dim:  #7a6230;
+    --amber:     #e07b30;
+    --text:      #e8e0d0;
+    --muted:     #7a7060;
+    --success:   #4caf7d;
+    --danger:    #c94c4c;
+    --scan-glow: rgba(201,168,76,0.25);
+    --font-head: 'Playfair Display', serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --r:  12px;
+    --rl: 20px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999; opacity: 0.6;
+  }
+
+  .app {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    grid-template-columns: 1fr 360px;
+    grid-template-areas: "header header" "tabs tabs" "main sidebar";
+    min-height: 100vh;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  header {
+    grid-area: header;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo { font-family: var(--font-head); font-size: 26px; color: var(--gold); }
+  .logo span { color: var(--muted); font-size: 18px; margin-left: 4px; }
+  .status-bar { display: flex; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); transition: background 0.4s; }
+  .status-dot.ok { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+  .tabs {
+    grid-area: tabs;
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+  }
+  .tab {
+    padding: 12px 24px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: var(--font-body);
+    margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+  main {
+    grid-area: main;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .tab-panel { display: none; flex-direction: column; gap: 28px; }
+  .tab-panel.active { display: flex; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px 20px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .stat-value { font-family: var(--font-mono); font-size: 24px; color: var(--gold); font-weight: 500; }
+
+  .scan-zone {
+    position: relative;
+    border: 1.5px solid var(--border);
+    border-radius: var(--rl);
+    padding: 40px 32px;
+    text-align: center;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    overflow: hidden;
+  }
+  .scan-zone::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, var(--scan-glow), transparent 70%);
+    opacity: 0; transition: opacity 0.5s;
+  }
+  .scan-zone.active { border-color: var(--gold); box-shadow: 0 0 40px var(--scan-glow); }
+  .scan-zone.active::before { opacity: 1; }
+  .scan-icon { font-size: 64px; display: block; margin-bottom: 12px; animation: float 3s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  .scan-zone.active .scan-icon { animation: pulse-icon 0.6s ease; }
+  @keyframes pulse-icon { 0%{transform:scale(1)} 50%{transform:scale(1.2)} 100%{transform:scale(1)} }
+  .scan-title { font-family: var(--font-head); font-size: 22px; color: var(--gold); margin-bottom: 4px; }
+  .scan-name { font-size: 18px; color: var(--amber); font-weight: 500; min-height: 26px; margin-bottom: 4px; }
+  .scan-sub { color: var(--muted); font-size: 13px; }
+  .uid-display { margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); letter-spacing: 0.1em; min-height: 18px; }
+
+  .drink-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--rl); padding: 24px; display: none; animation: slide-up 0.3s ease; }
+  .drink-panel.visible { display: block; }
+  @keyframes slide-up { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .drink-panel-title { font-family: var(--font-head); font-size: 18px; color: var(--gold); margin-bottom: 6px; }
+  .drink-panel-sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .drink-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px,1fr)); gap: 10px; }
+  .drink-btn {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 16px 12px; cursor: pointer; text-align: center;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    color: var(--text); font-family: var(--font-body);
+  }
+  .drink-btn:hover { border-color: var(--gold-dim); background: #252018; transform: translateY(-2px); }
+  .drink-btn:active { transform: translateY(0); }
+  .drink-btn .emoji { font-size: 28px; display: block; margin-bottom: 6px; }
+  .drink-btn .dname { font-size: 13px; font-weight: 500; display: block; }
+
+  aside { grid-area: sidebar; border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+  .sidebar-head { padding: 24px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .sidebar-head h2 { font-family: var(--font-head); font-size: 18px; color: var(--gold); }
+  .clear-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; padding: 4px 10px; cursor: pointer; font-family: var(--font-body); transition: border-color 0.2s, color 0.2s; }
+  .clear-btn:hover { border-color: var(--danger); color: var(--danger); }
+  .order-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+  .order-list::-webkit-scrollbar { width: 4px; }
+  .order-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .order-item { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: var(--r); transition: background 0.2s; animation: slide-in 0.25s ease; }
+  @keyframes slide-in { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+  .order-item:hover { background: var(--card); }
+  .order-emoji { font-size: 22px; flex-shrink: 0; }
+  .order-info { flex: 1; min-width: 0; }
+  .order-drink { font-weight: 500; font-size: 14px; }
+  .order-person { font-size: 12px; color: var(--amber); }
+  .order-meta { font-family: var(--font-mono); font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .order-del { background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: color 0.2s, background 0.2s; line-height: 1; }
+  .order-del:hover { color: var(--danger); background: rgba(201,76,76,0.1); }
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); font-size: 13px; }
+  .empty-state .es-icon { font-size: 40px; display: block; margin-bottom: 10px; opacity: 0.4; }
+
+  /* Stats Table */
+  .stats-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--rl); overflow: hidden; }
+  .stats-table th { background: var(--card); text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .stats-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .stats-table tr:last-child td { border-bottom: none; }
+  .stats-table .name { font-weight: 500; color: var(--gold); }
+  .stats-table .drink { display: flex; align-items: center; gap: 6px; }
+  .stats-table .emoji { font-size: 18px; }
+  .stats-table .count { font-family: var(--font-mono); color: var(--amber); font-weight: 500; }
+
+  /* Personen */
+  .users-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--rl); padding: 24px; }
+  .users-panel h3 { font-family: var(--font-head); font-size: 20px; color: var(--gold); margin-bottom: 6px; }
+  .users-panel p { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .add-user-form { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .input-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+  .input-group label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .nfc-input {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-family: var(--font-mono); font-size: 13px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .nfc-input:focus { border-color: var(--gold-dim); }
+  .nfc-input::placeholder { color: var(--muted); }
+  .name-input {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-family: var(--font-body); font-size: 14px;
+    outline: none; transition: border-color 0.2s; width: 100%;
+  }
+  .name-input:focus { border-color: var(--gold-dim); }
+  .scan-fill-hint { font-size: 11px; color: var(--gold-dim); margin-top: 3px; }
+  .btn-primary {
+    background: var(--gold-dim); border: none; border-radius: 8px;
+    padding: 10px 20px; color: var(--text); font-family: var(--font-body); font-size: 14px;
+    cursor: pointer; transition: background 0.2s; white-space: nowrap; align-self: flex-end;
+  }
+  .btn-primary:hover { background: var(--gold); color: var(--bg); }
+  .users-table { width: 100%; border-collapse: collapse; }
+  .users-table th { text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .users-table td { padding: 10px 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .users-table tr:last-child td { border-bottom: none; }
+  .users-table .uid-cell { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .users-table .del-user { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: color 0.2s; }
+  .users-table .del-user:hover { color: var(--danger); }
+
+  #toast-container { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast { background: var(--card); border: 1px solid var(--gold-dim); border-radius: var(--r); padding: 12px 20px; font-size: 14px; animation: toast-in 0.3s ease, toast-out 0.3s ease 2.2s forwards; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  @keyframes toast-in  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  @keyframes toast-out { to{opacity:0;transform:translateY(8px)} }
+
+  @media (max-width: 768px) {
+    .app { grid-template-columns: 1fr; grid-template-areas: "header" "tabs" "main" "sidebar"; }
+    aside { border-left: none; border-top: 1px solid var(--border); }
+    .stats-row { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">KlangKo <span>Bar</span></div>
+    <div class="status-bar">
+      <div id="status-dot" class="status-dot"></div>
+      <span id="status-label">Reader nicht verbunden</span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('kasse')">🍺 Kasse</button>
+    <button class="tab" onclick="switchTab('stats')">📊 Statistik</button>
+    <button class="tab" onclick="switchTab('personen')">👤 Personen</button>
+  </div>
+
+  <main>
+
+    <div class="tab-panel active" id="tab-kasse">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Bestellungen heute</div>
+          <div class="stat-value" id="stat-count">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Getränke insgesamt</div>
+          <div class="stat-value" id="stat-total">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Letzte Person</div>
+          <div class="stat-value" id="stat-person" style="font-size:14px;padding-top:6px;color:var(--muted)">—</div>
+        </div>
+      </div>
+
+      <div class="scan-zone" id="scan-zone">
+        <span class="scan-icon">📡</span>
+        <div class="scan-title">Karte auflegen</div>
+        <div class="scan-name" id="scan-name"></div>
+        <div class="scan-sub">NFC-Chip an den Reader halten um ein Getränk zu buchen</div>
+        <div class="uid-display" id="uid-display"></div>
+      </div>
+
+      <div class="drink-panel" id="drink-panel">
+        <div class="drink-panel-title" id="drink-panel-title">Welches Getränk?</div>
+        <div class="drink-panel-sub" id="drink-panel-sub"></div>
+        <div class="drink-grid" id="drink-grid"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-stats">
+      <h2 style="font-family:var(--font-head);font-size:20px;color:var(--gold);margin-bottom:16px">Bestellübersicht</h2>
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>Person</th>
+            <th>Getränk</th>
+            <th style="text-align:right">Anzahl</th>
+          </tr>
+        </thead>
+        <tbody id="stats-tbody">
+          <tr><td colspan="3" style="color:var(--muted);font-size:13px;padding:20px 10px;text-align:center">Noch keine Bestellungen</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tab-panel" id="tab-personen">
+      <div class="users-panel">
+        <h3>Personen verwalten</h3>
+        <p>Karte auflegen um die UID automatisch einzutragen, dann Namen vergeben.</p>
+
+        <div class="add-user-form">
+          <div class="input-group">
+            <label>UID (Karte auflegen oder manuell)</label>
+            <input class="nfc-input" id="user-uid-input" placeholder="z.B. 04a3b2c1" />
+            <span class="scan-fill-hint">📡 Karte auflegen → UID wird automatisch eingetragen</span>
+          </div>
+          <div class="input-group">
+            <label>Name</label>
+            <input class="name-input" id="user-name-input" placeholder="z.B. Maria" />
+          </div>
+          <button class="btn-primary" onclick="saveUser()">Speichern</button>
+        </div>
+
+        <table class="users-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>UID</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="3" style="color:var(--muted);font-size:13px;padding:20px 10px">Noch keine Personen angelegt</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <aside>
+    <div class="sidebar-head">
+      <h2>Bestellungen</h2>
+      <button class="clear-btn" onclick="clearAll()">Alle löschen</button>
+    </div>
+    <div class="order-list" id="order-list">
+      <div class="empty-state">
+        <span class="es-icon">🫙</span>
+        Noch keine Bestellungen
+      </div>
+    </div>
+  </aside>
+
+</div>
+<div id="toast-container"></div>
+
+<script>
+let ws;
+let state = { drinks: {}, orders: [], users: [], stats: [] };
+let currentUid = null;
+let currentUserName = null;
+
+function connect() {
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
+  ws.onopen = () => console.log('Verbunden');
+  ws.onmessage = ({ data }) => {
+    let msg; try { msg = JSON.parse(data); } catch { return; }
+    handleMessage(msg);
+  };
+  ws.onclose = () => {
+    setReaderStatus(false, 'Verbindung unterbrochen – reconnect in 3s…');
+    setTimeout(connect, 3000);
+  };
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'init':
+      state = { drinks: msg.drinks, orders: msg.orders, users: msg.users, stats: msg.stats };
+      renderDrinkGrid();
+      renderOrders();
+      renderStats();
+      renderUsers();
+      updateStats();
+      if (msg.readerStatus) setReaderStatus(msg.readerStatus.connected, msg.readerStatus.connected ? msg.readerStatus.name : 'Reader nicht verbunden');
+      break;
+    case 'reader_status':
+      setReaderStatus(msg.connected, msg.connected ? msg.name : 'Reader nicht verbunden');
+      break;
+    case 'card_scanned':
+      onCardScanned(msg.uid, msg.userName);
+      break;
+    case 'card_removed':
+      setTimeout(() => { if (currentUid) { currentUid = null; currentUserName = null; hideDrinkPanel(); } }, 5000);
+      break;
+    case 'order_added':
+      state.orders.unshift(msg.order);
+      renderOrders();
+      updateStats();
+      showToast(`✅ ${msg.order.drink.emoji} gebucht${msg.order.userName ? ' für ' + msg.order.userName : ''}`);
+      currentUid = null; currentUserName = null;
+      hideDrinkPanel();
+      break;
+    case 'order_removed':
+      state.orders = state.orders.filter(o => o.id !== msg.orderId);
+      renderOrders();
+      updateStats();
+      break;
+    case 'orders_updated':
+      state.orders = msg.orders;
+      renderOrders();
+      updateStats();
+      break;
+    case 'stats_updated':
+      state.stats = msg.stats;
+      renderStats();
+      break;
+    case 'users_updated':
+      state.users = msg.users;
+      renderUsers();
+      break;
+    case 'drinks_updated':
+      state.drinks = msg.drinks;
+      renderDrinkGrid();
+      break;
+  }
+}
+
+function setReaderStatus(ok, label) {
+  document.getElementById('status-dot').className = 'status-dot' + (ok ? ' ok' : '');
+  document.getElementById('status-label').textContent = label;
+}
+
+function onCardScanned(uid, userName) {
+  currentUid = uid;
+  currentUserName = userName;
+  const zone = document.getElementById('scan-zone');
+  zone.classList.add('active');
+  setTimeout(() => zone.classList.remove('active'), 800);
+  document.getElementById('uid-display').textContent = uid.toUpperCase();
+  document.getElementById('scan-name').textContent = userName || '';
+  document.getElementById('stat-person').textContent = userName || uid.slice(0,8) + '…';
+  document.getElementById('drink-panel-title').textContent = userName ? `Was trinkt ${userName}?` : 'Welches Getränk?';
+  document.getElementById('drink-panel-sub').textContent = 'UID: ' + uid.toUpperCase();
+  document.getElementById('drink-panel').classList.add('visible');
+  const uidInput = document.getElementById('user-uid-input');
+  if (uidInput && !uidInput.value) uidInput.value = uid.toUpperCase();
+}
+
+function hideDrinkPanel() {
+  document.getElementById('drink-panel').classList.remove('visible');
+  document.getElementById('uid-display').textContent = '';
+  document.getElementById('scan-name').textContent = '';
+}
+
+function bookDrink(drinkId) {
+  if (!currentUid) return;
+  send({ type: 'book', uid: currentUid, drinkId });
+}
+
+function renderDrinkGrid() {
+  document.getElementById('drink-grid').innerHTML = Object.values(state.drinks).map(d => `
+    <button class="drink-btn" onclick="bookDrink('${d.id}')">
+      <span class="emoji">${d.emoji}</span>
+      <span class="dname">${d.name}</span>
+    </button>
+  `).join('');
+}
+
+function renderOrders() {
+  const el = document.getElementById('order-list');
+  if (!state.orders.length) {
+    el.innerHTML = `<div class="empty-state"><span class="es-icon">🫙</span>Noch keine Bestellungen</div>`;
+    return;
+  }
+  el.innerHTML = state.orders.map(o => `
+    <div class="order-item" id="order-${o.id}">
+      <span class="order-emoji">${o.drink.emoji}</span>
+      <div class="order-info">
+        <div class="order-drink">${o.drink.name}</div>
+        ${o.userName ? `<div class="order-person">${o.userName}</div>` : ''}
+        <div class="order-meta">${o.uid.toUpperCase()} · ${fmtTime(o.timestamp)}</div>
+      </div>
+      <button class="order-del" onclick="cancelOrder(${o.id})">×</button>
+    </div>
+  `).join('');
+}
+
+function renderStats() {
+  const tbody = document.getElementById('stats-tbody');
+  if (!state.stats.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="color:var(--muted);font-size:13px;padding:20px 10px;text-align:center">Noch keine Bestellungen</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = state.stats.map(s => `
+    <tr>
+      <td class="name">${s.name}</td>
+      <td class="drink"><span class="emoji">${s.emoji}</span> ${s.drink_name}</td>
+      <td class="count" style="text-align:right">${s.count}</td>
+    </tr>
+  `).join('');
+}
+
+function renderUsers() {
+  const tbody = document.getElementById('users-tbody');
+  if (!state.users.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="color:var(--muted);font-size:13px;padding:20px 10px">Noch keine Personen angelegt</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = state.users.map(u => `
+    <tr>
+      <td>${u.name}</td>
+      <td class="uid-cell">${u.uid.toUpperCase()}</td>
+      <td><button class="del-user" onclick="deleteUser('${u.uid}')">×</button></td>
+    </tr>
+  `).join('');
+}
+
+function updateStats() {
+  const today = new Date().toDateString();
+  const todayOrders = state.orders.filter(o => new Date(o.timestamp).toDateString() === today);
+  document.getElementById('stat-count').textContent = todayOrders.length;
+  document.getElementById('stat-total').textContent = state.orders.length;
+}
+
+function saveUser() {
+  const uid  = document.getElementById('user-uid-input').value.trim().toLowerCase().replace(/\s/g,'');
+  const name = document.getElementById('user-name-input').value.trim();
+  if (!uid || !name) { showToast('⚠️ UID und Name ausfüllen'); return; }
+  send({ type: 'upsert_user', uid, name });
+  document.getElementById('user-uid-input').value = '';
+  document.getElementById('user-name-input').value = '';
+  showToast(`✅ ${name} gespeichert`);
+}
+
+function deleteUser(uid) {
+  if (!confirm('Person wirklich löschen?')) return;
+  send({ type: 'delete_user', uid });
+}
+
+function cancelOrder(id) { send({ type: 'cancel', orderId: id }); }
+
+function clearAll() {
+  if (!confirm('Alle Bestellungen löschen?')) return;
+  state.orders.forEach(o => send({ type: 'cancel', orderId: o.id }));
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['kasse','stats','personen'][i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-' + name);
+  });
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+connect();
+</script>
+</body>
+</html>

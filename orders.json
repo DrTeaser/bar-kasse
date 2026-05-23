@@ -1,0 +1,150 @@
+{
+  "drinks": {
+    "beer": {
+      "id": "beer",
+      "name": "Bier",
+      "price": 3.5,
+      "emoji": "🍺"
+    },
+    "wine": {
+      "id": "wine",
+      "name": "Wein",
+      "price": 4,
+      "emoji": "🍷"
+    },
+    "water": {
+      "id": "water",
+      "name": "Wasser",
+      "price": 1.5,
+      "emoji": "💧"
+    },
+    "softdrink": {
+      "id": "softdrink",
+      "name": "Softdrink",
+      "price": 2.5,
+      "emoji": "🥤"
+    },
+    "shot": {
+      "id": "shot",
+      "name": "Shot",
+      "price": 2,
+      "emoji": "🥃"
+    },
+    "cocktail": {
+      "id": "cocktail",
+      "name": "Cocktail",
+      "price": 7,
+      "emoji": "🍹"
+    }
+  },
+  "orders": [
+    {
+      "id": 1779443204545,
+      "uid": "9267e43d",
+      "drinkId": "cocktail",
+      "drink": {
+        "id": "cocktail",
+        "name": "Cocktail",
+        "price": 7,
+        "emoji": "🍹"
+      },
+      "timestamp": "2026-05-22T09:46:44.545Z"
+    },
+    {
+      "id": 1779443168795,
+      "uid": "1b74e43d",
+      "drinkId": "softdrink",
+      "drink": {
+        "id": "softdrink",
+        "name": "Softdrink",
+        "price": 2.5,
+        "emoji": "🥤"
+      },
+      "timestamp": "2026-05-22T09:46:08.795Z"
+    },
+    {
+      "id": 1779443117263,
+      "uid": "1b74e43d",
+      "drinkId": "beer",
+      "drink": {
+        "id": "beer",
+        "name": "Bier",
+        "price": 3.5,
+        "emoji": "🍺"
+      },
+      "timestamp": "2026-05-22T09:45:17.263Z"
+    },
+    {
+      "id": 1779441227767,
+      "uid": "1b74e43d",
+      "drinkId": "wine",
+      "drink": {
+        "id": "wine",
+        "name": "Wein",
+        "price": 4,
+        "emoji": "🍷"
+      },
+      "timestamp": "2026-05-22T09:13:47.767Z"
+    },
+    {
+      "id": 1779441216934,
+      "uid": "6305e63d",
+      "drinkId": "beer",
+      "drink": {
+        "id": "beer",
+        "name": "Bier",
+        "price": 3.5,
+        "emoji": "🍺"
+      },
+      "timestamp": "2026-05-22T09:13:36.934Z"
+    },
+    {
+      "id": 1779440806221,
+      "uid": "6305e63d",
+      "drinkId": "water",
+      "drink": {
+        "id": "water",
+        "name": "Wasser",
+        "price": 1.5,
+        "emoji": "💧"
+      },
+      "timestamp": "2026-05-22T09:06:46.221Z"
+    },
+    {
+      "id": 1779440792371,
+      "uid": "6305e63d",
+      "drinkId": "shot",
+      "drink": {
+        "id": "shot",
+        "name": "Shot",
+        "price": 2,
+        "emoji": "🥃"
+      },
+      "timestamp": "2026-05-22T09:06:32.371Z"
+    },
+    {
+      "id": 1779440785287,
+      "uid": "6305e63d",
+      "drinkId": "wine",
+      "drink": {
+        "id": "wine",
+        "name": "Wein",
+        "price": 4,
+        "emoji": "🍷"
+      },
+      "timestamp": "2026-05-22T09:06:25.287Z"
+    },
+    {
+      "id": 1779440763073,
+      "uid": "6305e63d",
+      "drinkId": "beer",
+      "drink": {
+        "id": "beer",
+        "name": "Bier",
+        "price": 3.5,
+        "emoji": "🍺"
+      },
+      "timestamp": "2026-05-22T09:06:03.073Z"
+    }
+  ]
+}
