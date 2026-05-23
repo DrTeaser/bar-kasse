@@ -221,3 +221,8 @@ wss.on('connection', ws => {
 
   ws.on('close', () => console.log('Browser getrennt'));
 });
+
+// ─── Server starten ─────────────────────────────────────────────
+httpServer.listen(PORT, () => {
+  console.log(`Server läuft auf Port ${PORT}`);
+});
