@@ -291,8 +291,15 @@ function startPolling() {
   }, 3000);
 }
 
-attachNFC();
-if (!nfcInstance) startPolling();
+httpServer.listen(PORT, () => {
+  console.log(`\n🍺 NFC Kassensystem läuft`);
+  console.log(`   → http://localhost:${PORT}`);
+  console.log(`   → Datenbank: /home/jerry/kassensystem/bar.db\n`);
+  setTimeout(() => {
+    attachNFC();
+    if (!nfcInstance) startPolling();
+  }, 500);
+});
 
 // ─── Server starten ───────────────────────────────────────────────────────────
 httpServer.listen(PORT, () => {
