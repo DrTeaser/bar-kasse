@@ -14,7 +14,7 @@ const path       = require('path');
 const Database   = require('better-sqlite3');
 
 // ─── Konfiguration ────────────────────────────────────────────────────────────
-const PORT    = 3000;
+const PORT    = 3001;
 const DB_FILE = path.join(__dirname, 'bar.db');
 
 // ─── Reader Status (wird gleich am Anfang deklariert) ──────────────────────────
