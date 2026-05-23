@@ -1,12 +1,9 @@
 /**
- * NFC Kassensystem – Server
- * - ACR122U via nfc-pcsc
+ * Kassensystem – Server
  * - SQLite Datenbank (users + orders)
  * - WebSocket für Echtzeit-Updates
  * - HTTP für statische Dateien
  */
-
-// const { NFC }    = require('nfc-pcsc');
 const WebSocket  = require('ws');
 const http       = require('http');
 const fs         = require('fs');
@@ -16,9 +13,6 @@ const Database   = require('better-sqlite3');
 // ─── Konfiguration ────────────────────────────────────────────────────────────
 const PORT    = 3001;
 const DB_FILE = path.join(__dirname, 'bar.db');
-
-// ─── Reader Status (wird gleich am Anfang deklariert) ──────────────────────────
-let readerStatus = { connected: false, name: '' };
 
 // ─── Datenbank einrichten ─────────────────────────────────────────────────────
 const db = new Database(DB_FILE);
@@ -155,7 +149,6 @@ wss.on('connection', ws => {
     orders:       getOrders(),
     users:        getUsers(),
     stats:        getStats(),
-    readerStatus,
   }));
 
   ws.on('message', raw => {
@@ -228,82 +221,3 @@ wss.on('connection', ws => {
 
   ws.on('close', () => console.log('Browser getrennt'));
 });
-
-// ─── NFC-Reader (Hot-Plug) ────────────────────────────────────────────────────
-let nfcInstance  = null;
-let nfcPolling   = null;
-
-function attachNFC() {
-  if (nfcInstance) return;
-
-  try {
-    const nfc = new NFC();
-    nfcInstance = nfc;
-
-    nfc.on('reader', reader => {
-      console.log(`✅ NFC-Reader erkannt: ${reader.reader.name}`);
-      readerStatus = { connected: true, name: reader.reader.name };
-      broadcast({ type: 'reader_status', ...readerStatus });
-
-      reader.on('card', card => {
-        const uid = card.uid;
-        console.log('📶 Karte gescannt, UID:', uid);
-        const user = db.prepare('SELECT name FROM users WHERE uid = ?').get(uid);
-        broadcast({ type: 'card_scanned', uid, userName: user ? user.name : null });
-      });
-
-      reader.on('card.off', () => broadcast({ type: 'card_removed' }));
-
-      reader.on('end', () => {
-        console.log('Reader entfernt');
-        readerStatus = { connected: false, name: '' };
-        broadcast({ type: 'reader_status', connected: false });
-      });
-
-      reader.on('error', err => console.error('Reader Fehler:', err.message));
-    });
-
-    nfc.on('error', err => {
-      console.warn('NFC Fehler (wird automatisch erneut versucht):', err.message);
-      detachNFC();
-    });
-
-    console.log('✅ NFC-Dienst gestartet – warte auf Lesegerät …');
-    if (nfcPolling) { clearInterval(nfcPolling); nfcPolling = null; }
-
-  } catch (err) {
-    nfcInstance = null;
-  }
-}
-
-function detachNFC() {
-  if (nfcInstance) {
-    try { nfcInstance.close(); } catch (_) {}
-    nfcInstance = null;
-  }
-  readerStatus = { connected: false, name: '' };
-  startPolling();
-}
-
-function startPolling() {
-  if (nfcPolling) return;
-  console.log('🔄 Warte auf NFC-Lesegerät (prüfe alle 3 s) …');
-  // nfcPolling = setInterval(() => {
-  //   if (!nfcInstance) attachNFC();
-  // }, 3000);
-}
-  
-// httpServer.listen(PORT, () => {
-//   console.log(`\n🍺 NFC Kassensystem läuft`);
-//   console.log(`   → http://localhost:${PORT}`);
-//   console.log(`   → Datenbank: /home/jerry/kassensystem/bar.db\n`);
-
-//   setImmediate(() => {
-//     try {
-//       attachNFC();
-//       if (!nfcInstance) startPolling();
-//     } catch (err) {
-//       console.error('NFC init failed:', err);
-//     }
-//   });
-// });

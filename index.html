@@ -124,10 +124,22 @@
   }
   .scan-zone.active { border-color: var(--gold); box-shadow: 0 0 40px var(--scan-glow); }
   .scan-zone.active::before { opacity: 1; }
-  .scan-icon { font-size: 64px; display: block; margin-bottom: 12px; animation: float 3s ease-in-out infinite; }
-  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-  .scan-zone.active .scan-icon { animation: pulse-icon 0.6s ease; }
-  @keyframes pulse-icon { 0%{transform:scale(1)} 50%{transform:scale(1.2)} 100%{transform:scale(1)} }
+  .scan-input {
+    width: min(360px, 100%);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 18px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    margin: 0 auto 12px;
+  }
+  .scan-input:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 2px var(--scan-glow); }
+  .scan-zone.active .scan-input { border-color: var(--gold); box-shadow: 0 0 0 2px var(--scan-glow); }
   .scan-title { font-family: var(--font-head); font-size: 22px; color: var(--gold); margin-bottom: 4px; }
   .scan-name { font-size: 18px; color: var(--amber); font-weight: 500; min-height: 26px; margin-bottom: 4px; }
   .scan-sub { color: var(--muted); font-size: 13px; }
@@ -235,7 +247,7 @@
     <div class="logo">KlangKo <span>Bar</span></div>
     <div class="status-bar">
       <div id="status-dot" class="status-dot"></div>
-      <span id="status-label">Reader nicht verbunden</span>
+      <span id="status-label">Scanner bereit</span>
     </div>
   </header>
 
@@ -264,10 +276,10 @@
       </div>
 
       <div class="scan-zone" id="scan-zone">
-        <span class="scan-icon">📡</span>
-        <div class="scan-title">Karte auflegen</div>
+        <input class="scan-input" id="scan-input" placeholder="Scanner-Feld: UID" autocomplete="off" />
+        <div class="scan-title">Scan erfassen</div>
         <div class="scan-name" id="scan-name"></div>
-        <div class="scan-sub">NFC-Chip an den Reader halten um ein Getränk zu buchen</div>
+        <div class="scan-sub">Scanner tippt die UID automatisch – danach Getränk auswählen</div>
         <div class="uid-display" id="uid-display"></div>
       </div>
 
@@ -297,13 +309,13 @@
     <div class="tab-panel" id="tab-personen">
       <div class="users-panel">
         <h3>Personen verwalten</h3>
-        <p>Karte auflegen um die UID automatisch einzutragen, dann Namen vergeben.</p>
+        <p>Scanner tippt die UID automatisch ein – danach Namen vergeben.</p>
 
         <div class="add-user-form">
           <div class="input-group">
-            <label>UID (Karte auflegen oder manuell)</label>
+            <label>UID (Scanner oder manuell)</label>
             <input class="nfc-input" id="user-uid-input" placeholder="z.B. 04a3b2c1" />
-            <span class="scan-fill-hint">📡 Karte auflegen → UID wird automatisch eingetragen</span>
+            <span class="scan-fill-hint">Scanner tippt UID → Feld wird automatisch gefüllt</span>
           </div>
           <div class="input-group">
             <label>Name</label>
@@ -350,10 +362,14 @@ let ws;
 let state = { drinks: {}, orders: [], users: [], stats: [] };
 let currentUid = null;
 let currentUserName = null;
+let scanTimer = null;
 
 function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
-  ws.onopen = () => console.log('Verbunden');
+  ws.onopen = () => {
+    console.log('Verbunden');
+    setReaderStatus(true, 'Scanner bereit');
+  };
   ws.onmessage = ({ data }) => {
     let msg; try { msg = JSON.parse(data); } catch { return; }
     handleMessage(msg);
@@ -377,16 +393,6 @@ function handleMessage(msg) {
       renderStats();
       renderUsers();
       updateStats();
-      if (msg.readerStatus) setReaderStatus(msg.readerStatus.connected, msg.readerStatus.connected ? msg.readerStatus.name : 'Reader nicht verbunden');
-      break;
-    case 'reader_status':
-      setReaderStatus(msg.connected, msg.connected ? msg.name : 'Reader nicht verbunden');
-      break;
-    case 'card_scanned':
-      onCardScanned(msg.uid, msg.userName);
-      break;
-    case 'card_removed':
-      setTimeout(() => { if (currentUid) { currentUid = null; currentUserName = null; hideDrinkPanel(); } }, 5000);
       break;
     case 'order_added':
       state.orders.unshift(msg.order);
@@ -424,6 +430,42 @@ function handleMessage(msg) {
 function setReaderStatus(ok, label) {
   document.getElementById('status-dot').className = 'status-dot' + (ok ? ' ok' : '');
   document.getElementById('status-label').textContent = label;
+}
+
+function normalizeUid(value) {
+  return value.trim().toLowerCase().replace(/\s/g,'');
+}
+
+function processScan(rawValue) {
+  const uid = normalizeUid(rawValue);
+  if (!uid) return;
+  const user = state.users.find(u => normalizeUid(u.uid) === uid);
+  onCardScanned(uid, user ? user.name : null);
+  const scanInput = document.getElementById('scan-input');
+  if (scanInput) {
+    scanInput.value = '';
+    scanInput.focus();
+  }
+}
+
+function setupScanInput() {
+  const scanInput = document.getElementById('scan-input');
+  if (!scanInput) return;
+  scanInput.addEventListener('input', () => {
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(() => processScan(scanInput.value), 80);
+  });
+  scanInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    clearTimeout(scanTimer);
+    processScan(scanInput.value);
+  });
+}
+
+function focusScanInput() {
+  const scanInput = document.getElementById('scan-input');
+  if (scanInput && document.activeElement !== scanInput) scanInput.focus();
 }
 
 function onCardScanned(uid, userName) {
@@ -519,7 +561,7 @@ function updateStats() {
 }
 
 function saveUser() {
-  const uid  = document.getElementById('user-uid-input').value.trim().toLowerCase().replace(/\s/g,'');
+  const uid  = normalizeUid(document.getElementById('user-uid-input').value);
   const name = document.getElementById('user-name-input').value.trim();
   if (!uid || !name) { showToast('⚠️ UID und Name ausfüllen'); return; }
   send({ type: 'upsert_user', uid, name });
@@ -547,6 +589,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => {
     p.classList.toggle('active', p.id === 'tab-' + name);
   });
+  if (name === 'kasse') focusScanInput();
 }
 
 function fmtTime(iso) {
@@ -561,7 +604,9 @@ function showToast(msg) {
   setTimeout(() => t.remove(), 2600);
 }
 
+setupScanInput();
 connect();
+focusScanInput();
 </script>
 </body>
 </html>

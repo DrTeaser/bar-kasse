@@ -1,14 +1,14 @@
-# 🍺 NFC Kassensystem – KlangKo Bar
+# 🍺 Kassensystem – KlangKo Bar
 
-Getränke-Kassensystem mit ACR122U NFC-Reader, Node.js-Backend und Browser-Frontend.
+Getränke-Kassensystem mit Scanner im Tastaturmodus, Node.js-Backend und Browser-Frontend.
 
 ---
 
 ## Dateien
 
 ```
-nfc-server/
-├── server.js       ← Node.js Backend (NFC + WebSocket + HTTP)
+bar-kasse/
+├── server.js       ← Node.js Backend (WebSocket + HTTP)
 ├── index.html      ← Frontend (Bar-Interface)
 ├── package.json    ← Abhängigkeiten
 └── orders.json     ← Automatisch generiert (Bestellspeicher)
@@ -22,16 +22,10 @@ nfc-server/
 # 1. Abhängigkeiten installieren
 npm install
 
-# 2. ACR122U anstecken, dann:
+# 2. Scanner im Tastaturmodus verbinden, dann:
 node server.js
 
 # → http://localhost:3000 im Browser öffnen
-```
-
-Falls der Reader nicht erkannt wird:
-```bash
-sudo killall -9 pcscd   # PC/SC Daemon neu starten
-node server.js
 ```
 
 ---
@@ -44,13 +38,6 @@ node server.js
 # Node.js (v18+)
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
-
-# PC/SC Daemon (für NFC-Reader)
-sudo apt-get install -y pcscd pcsc-tools libpcsclite-dev
-
-# PC/SC Daemon starten & beim Boot aktivieren
-sudo systemctl enable pcscd
-sudo systemctl start pcscd
 
 # Nginx (Reverse Proxy)
 sudo apt-get install -y nginx
@@ -65,11 +52,11 @@ sudo npm install -g pm2
 
 ```bash
 # Vom Mac aus – Dateien per SCP übertragen
-scp -r ./nfc-server user@DEINE-SERVER-IP:/home/user/nfc-server
+scp -r ./bar-kasse user@DEINE-SERVER-IP:/home/user/bar-kasse
 
 # Auf dem Server: Abhängigkeiten installieren
 ssh user@DEINE-SERVER-IP
-cd /home/user/nfc-server
+cd /home/user/bar-kasse
 npm install
 ```
 
@@ -78,7 +65,7 @@ npm install
 ### Node.js mit PM2 dauerhaft starten
 
 ```bash
-cd /home/user/nfc-server
+cd /home/user/bar-kasse
 pm2 start server.js --name "bar-kasse"
 pm2 save               # Autostart bei Neustart
 pm2 startup            # PM2 als Systemdienst registrieren
@@ -187,7 +174,4 @@ Nach Änderungen den Server neu starten: `pm2 restart bar-kasse`
 
 | Problem | Lösung |
 |---|---|
-| `Error: SCARD_E_NO_SERVICE` | `sudo systemctl restart pcscd` |
-| Reader wird nicht erkannt | USB neu einstecken, dann `node server.js` |
 | WebSocket verbindet nicht | Nginx-Config prüfen (Upgrade-Header!) |
-| `permission denied` für pcscd | User zur Gruppe `pcscd` hinzufügen: `sudo usermod -aG pcscd $USER` |
