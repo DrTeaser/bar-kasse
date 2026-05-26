@@ -9,6 +9,7 @@ const http       = require('http');
 const fs         = require('fs');
 const path       = require('path');
 const Database   = require('better-sqlite3');
+const XLSX       = require('xlsx');
 
 // ─── Konfiguration ────────────────────────────────────────────────────────────
 const PORT    = 3002;
@@ -111,6 +112,41 @@ function normalizeOrder(row) {
 // ─── HTTP-Server (statische Dateien) ──────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
   console.log('HTTP request:', req.url);
+
+  if (req.url === '/download-orders') {
+    const orders = db.prepare(`
+      SELECT
+        COALESCE(u.name, o.uid) AS name,
+        d.name AS drink_name,
+        d.emoji,
+        o.timestamp
+      FROM orders o
+      JOIN drinks d ON d.id = o.drink_id
+      LEFT JOIN users u ON u.uid = o.uid
+      ORDER BY o.timestamp DESC
+    `).all();
+
+    const wsData = orders.map(o => ({
+      'Name': o.name,
+      'Getränk': `${o.emoji} ${o.drink_name}`,
+      'Zeitstempel': o.timestamp,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(wsData);
+    ws['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 20 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Bestellungen');
+
+    const fileName = `Bestellungen_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+
+    res.writeHead(200, {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+    });
+    res.end(buffer);
+    return;
+  }
 
   const safePath = req.url === '/' ? '/index.html' : req.url;
   const filePath = path.join(__dirname, safePath);

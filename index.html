@@ -291,7 +291,10 @@
     </div>
 
     <div class="tab-panel" id="tab-stats">
-      <h2 style="font-family:var(--font-head);font-size:20px;color:var(--gold);margin-bottom:16px">Bestellübersicht</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="font-family:var(--font-head);font-size:20px;color:var(--gold);margin:0">Bestellübersicht</h2>
+        <button class="btn-primary" onclick="downloadExcel()" style="background:var(--gold-dim);padding:10px 20px">📥 Excel</button>
+      </div>
       <table class="stats-table">
         <thead>
           <tr>
@@ -602,6 +605,16 @@ function showToast(msg) {
   t.className = 'toast'; t.textContent = msg;
   document.getElementById('toast-container').appendChild(t);
   setTimeout(() => t.remove(), 2600);
+}
+
+function downloadExcel() {
+  const link = document.createElement('a');
+  link.href = '/download-orders';
+  link.download = `Bestellungen_${new Date().toISOString().split('T')[0]}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('📥 Excel wird heruntergeladen…');
 }
 
 setupScanInput();
