@@ -296,15 +296,13 @@
         <button class="btn-primary" onclick="downloadExcel()" style="background:var(--gold-dim);padding:10px 20px">📥 Excel</button>
       </div>
       <table class="stats-table">
-        <thead>
+        <thead id="stats-thead">
           <tr>
-            <th>Person</th>
-            <th>Getränk</th>
-            <th style="text-align:right">Anzahl</th>
+            <th>Name</th>
           </tr>
         </thead>
         <tbody id="stats-tbody">
-          <tr><td colspan="3" style="color:var(--muted);font-size:13px;padding:20px 10px;text-align:center">Noch keine Bestellungen</td></tr>
+          <tr><td colspan="10" style="color:var(--muted);font-size:13px;padding:20px 10px;text-align:center">Noch keine Bestellungen</td></tr>
         </tbody>
       </table>
     </div>
@@ -527,18 +525,44 @@ function renderOrders() {
 }
 
 function renderStats() {
+  const thead = document.getElementById('stats-thead');
   const tbody = document.getElementById('stats-tbody');
+  
   if (!state.stats.length) {
-    tbody.innerHTML = `<tr><td colspan="3" style="color:var(--muted);font-size:13px;padding:20px 10px;text-align:center">Noch keine Bestellungen</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:var(--muted);font-size:13px;padding:20px 10px;text-align:center">Noch keine Bestellungen</td></tr>`;
     return;
   }
-  tbody.innerHTML = state.stats.map(s => `
-    <tr>
-      <td class="name">${s.name}</td>
-      <td class="drink"><span class="emoji">${s.emoji}</span> ${s.drink_name}</td>
-      <td class="count" style="text-align:right">${s.count}</td>
-    </tr>
-  `).join('');
+
+  // Get unique drinks and persons from stats
+  const drinks = {};
+  const persons = {};
+  
+  state.stats.forEach(s => {
+    drinks[s.drink_name] = { emoji: s.emoji, id: s.drink_name };
+    if (!persons[s.name]) persons[s.name] = {};
+    persons[s.name][s.drink_name] = s.count;
+  });
+
+  // Build header with drink names
+  let headerHtml = '<tr><th>Name</th>';
+  Object.keys(drinks).sort().forEach(drinkName => {
+    headerHtml += `<th style="text-align:center">${drinks[drinkName].emoji} ${drinkName}</th>`;
+  });
+  headerHtml += '</tr>';
+  thead.innerHTML = headerHtml;
+
+  // Build body rows with person data
+  let bodyHtml = '';
+  Object.keys(persons).sort().forEach(personName => {
+    bodyHtml += `<tr><td class="name">${personName}</td>`;
+    Object.keys(drinks).sort().forEach(drinkName => {
+      const count = persons[personName][drinkName] || 0;
+      bodyHtml += `<td class="count" style="text-align:center">${count}</td>`;
+    });
+    bodyHtml += '</tr>';
+  });
+  
+  tbody.innerHTML = bodyHtml;
 }
 
 function renderUsers() {

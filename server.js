@@ -114,26 +114,44 @@ const httpServer = http.createServer((req, res) => {
   console.log('HTTP request:', req.url);
 
   if (req.url === '/download-orders') {
-    const orders = db.prepare(`
-      SELECT
-        COALESCE(u.name, o.uid) AS name,
+    // Get stats: person -> drink -> count
+    const stats = db.prepare(`
+      SELECT 
+        u.name,
         d.name AS drink_name,
         d.emoji,
-        o.timestamp
+        COUNT(*) AS count
       FROM orders o
+      JOIN users u ON u.uid = o.uid
       JOIN drinks d ON d.id = o.drink_id
-      LEFT JOIN users u ON u.uid = o.uid
-      ORDER BY o.timestamp DESC
+      GROUP BY u.uid, o.drink_id
+      ORDER BY u.name, d.name
     `).all();
 
-    const wsData = orders.map(o => ({
-      'Name': o.name,
-      'Getränk': `${o.emoji} ${o.drink_name}`,
-      'Zeitstempel': o.timestamp,
-    }));
+    // Organize data by person and drink
+    const persons = {};
+    const drinks = {};
+    
+    stats.forEach(s => {
+      drinks[s.drink_name] = { emoji: s.emoji };
+      if (!persons[s.name]) persons[s.name] = {};
+      persons[s.name][s.drink_name] = s.count;
+    });
+
+    // Build rows: Name | Bier | Wein | ... with counts
+    const drinkNames = Object.keys(drinks).sort();
+    const wsData = Object.keys(persons).sort().map(personName => {
+      const row = { 'Name': personName };
+      drinkNames.forEach(drinkName => {
+        row[drinkName] = persons[personName][drinkName] || 0;
+      });
+      return row;
+    });
 
     const ws = XLSX.utils.json_to_sheet(wsData);
-    ws['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 20 }];
+    const colWidths = [{ wch: 20 }].concat(drinkNames.map(() => ({ wch: 12 })));
+    ws['!cols'] = colWidths;
+    
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Bestellungen');
 
