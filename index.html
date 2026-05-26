@@ -402,6 +402,7 @@ function handleMessage(msg) {
       showToast(`✅ ${msg.order.drink.emoji} gebucht${msg.order.userName ? ' für ' + msg.order.userName : ''}`);
       currentUid = null; currentUserName = null;
       hideDrinkPanel();
+      focusScanInput();
       break;
     case 'order_removed':
       state.orders = state.orders.filter(o => o.id !== msg.orderId);
