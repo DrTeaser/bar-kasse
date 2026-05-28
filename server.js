@@ -1,8 +1,7 @@
 /**
  * Kassensystem – Server
- * - SQLite Datenbank (users + orders)
- * - WebSocket für Echtzeit-Updates
- * - HTTP für statische Dateien
+ * - Nutzt die bestehende datenbank2.db
+ * - Werkzeug-Tabellen werden ignoriert
  */
 const WebSocket  = require('ws');
 const http       = require('http');
@@ -13,17 +12,20 @@ const XLSX       = require('xlsx');
 
 // ─── Konfiguration ────────────────────────────────────────────────────────────
 const PORT    = 3002;
-const DB_FILE = path.join(__dirname, 'bar.db');
+const DB_FILE = path.join(__dirname, 'datenbank2.db'); // Neue Datenbank
+
+// ─── Konfiguration der bestehenden Personen-Tabelle ───────────────────────────
+// Falls deine Tabelle in datenbank2.db anders heißt, kannst du das hier anpassen:
+const USERS_TABLE = 'users'; // z.B. 'mitarbeiter', 'personen'
+const UID_COL     = 'uid';   // z.B. 'rfid_tag', 'card_id'
+const NAME_COL    = 'name';  // z.B. 'vorname', 'vollname'
 
 // ─── Datenbank einrichten ─────────────────────────────────────────────────────
 const db = new Database(DB_FILE);
 
+// Wir legen nur noch die Bar-spezifischen Tabellen an.
+// Die Benutzer-Tabelle (USERS_TABLE) existiert bereits aus dem Werkzeug-System.
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    uid  TEXT PRIMARY KEY,
-    name TEXT NOT NULL
-  );
-
   CREATE TABLE IF NOT EXISTS drinks (
     id    TEXT PRIMARY KEY,
     name  TEXT NOT NULL,
@@ -65,32 +67,32 @@ function getOrders() {
   return db.prepare(`
     SELECT o.id, o.uid, o.drink_id, o.timestamp,
            d.name AS drink_name, d.emoji,
-           u.name AS user_name
+           u.${NAME_COL} AS user_name
     FROM   orders o
     JOIN   drinks d ON d.id = o.drink_id
-    LEFT JOIN users u ON u.uid = o.uid
+    LEFT JOIN ${USERS_TABLE} u ON u.${UID_COL} = o.uid
     ORDER  BY o.id DESC
     LIMIT  200
   `).all().map(normalizeOrder);
 }
 
 function getUsers() {
-  return db.prepare('SELECT uid, name FROM users ORDER BY name').all();
+  return db.prepare(`SELECT ${UID_COL} AS uid, ${NAME_COL} AS name FROM ${USERS_TABLE} ORDER BY ${NAME_COL}`).all();
 }
 
 function getStats() {
   return db.prepare(`
     SELECT 
-      u.name,
-      u.uid,
+      u.${NAME_COL} AS name,
+      u.${UID_COL} AS uid,
       d.name AS drink_name,
       d.emoji,
       COUNT(*) AS count
     FROM orders o
-    JOIN users u ON u.uid = o.uid
+    JOIN ${USERS_TABLE} u ON u.${UID_COL} = o.uid
     JOIN drinks d ON d.id = o.drink_id
-    GROUP BY u.uid, o.drink_id
-    ORDER BY u.name, d.name
+    GROUP BY u.${UID_COL}, o.drink_id
+    ORDER BY u.${NAME_COL}, d.name
   `).all();
 }
 
@@ -111,24 +113,20 @@ function normalizeOrder(row) {
 
 // ─── HTTP-Server (statische Dateien) ──────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
-  console.log('HTTP request:', req.url);
-
   if (req.url === '/download-orders') {
-    // Get stats: person -> drink -> count
     const stats = db.prepare(`
       SELECT 
-        u.name,
+        u.${NAME_COL} AS name,
         d.name AS drink_name,
         d.emoji,
         COUNT(*) AS count
       FROM orders o
-      JOIN users u ON u.uid = o.uid
+      JOIN ${USERS_TABLE} u ON u.${UID_COL} = o.uid
       JOIN drinks d ON d.id = o.drink_id
-      GROUP BY u.uid, o.drink_id
-      ORDER BY u.name, d.name
+      GROUP BY u.${UID_COL}, o.drink_id
+      ORDER BY u.${NAME_COL}, d.name
     `).all();
 
-    // Organize data by person and drink
     const persons = {};
     const drinks = {};
     
@@ -138,7 +136,6 @@ const httpServer = http.createServer((req, res) => {
       persons[s.name][s.drink_name] = s.count;
     });
 
-    // Build rows: Name | Bier | Wein | ... with counts
     const drinkNames = Object.keys(drinks).sort();
     const wsData = Object.keys(persons).sort().map(personName => {
       const row = { 'Name': personName };
@@ -195,8 +192,6 @@ function broadcast(msg) {
 }
 
 wss.on('connection', ws => {
-  console.log('Browser verbunden');
-
   ws.send(JSON.stringify({
     type:         'init',
     drinks:       getDrinks(),
@@ -209,7 +204,6 @@ wss.on('connection', ws => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    // ── Getränk buchen ──────────────────────────────────────────
     if (msg.type === 'book') {
       const { uid, drinkId } = msg;
       const drink = db.prepare('SELECT * FROM drinks WHERE id = ?').get(drinkId);
@@ -222,10 +216,10 @@ wss.on('connection', ws => {
       const order = db.prepare(`
         SELECT o.id, o.uid, o.drink_id, o.timestamp,
                d.name AS drink_name, d.emoji,
-               u.name AS user_name
+               u.${NAME_COL} AS user_name
         FROM   orders o
         JOIN   drinks d ON d.id = o.drink_id
-        LEFT JOIN users u ON u.uid = o.uid
+        LEFT JOIN ${USERS_TABLE} u ON u.${UID_COL} = o.uid
         WHERE  o.id = ?
       `).get(result.lastInsertRowid);
 
@@ -233,19 +227,18 @@ wss.on('connection', ws => {
       broadcast({ type: 'stats_updated', stats: getStats() });
     }
 
-    // ── Bestellung stornieren ───────────────────────────────────
     if (msg.type === 'cancel') {
       db.prepare('DELETE FROM orders WHERE id = ?').run(msg.orderId);
       broadcast({ type: 'order_removed', orderId: msg.orderId });
       broadcast({ type: 'stats_updated', stats: getStats() });
     }
 
-    // ── Benutzer anlegen / umbenennen ───────────────────────────
     if (msg.type === 'upsert_user') {
       const { uid, name } = msg;
+      // Hinweis: Setzt voraus, dass UID_COL in der DB ein UNIQUE/PRIMARY KEY Constraint hat
       db.prepare(`
-        INSERT INTO users (uid, name) VALUES (?, ?)
-        ON CONFLICT(uid) DO UPDATE SET name = excluded.name
+        INSERT INTO ${USERS_TABLE} (${UID_COL}, ${NAME_COL}) VALUES (?, ?)
+        ON CONFLICT(${UID_COL}) DO UPDATE SET ${NAME_COL} = excluded.${NAME_COL}
       `).run(uid, name.trim());
 
       const users = getUsers();
@@ -254,15 +247,13 @@ wss.on('connection', ws => {
       broadcast({ type: 'stats_updated', stats: getStats() });
     }
 
-    // ── Benutzer löschen ────────────────────────────────────────
     if (msg.type === 'delete_user') {
-      db.prepare('DELETE FROM users WHERE uid = ?').run(msg.uid);
+      db.prepare(`DELETE FROM ${USERS_TABLE} WHERE ${UID_COL} = ?`).run(msg.uid);
       broadcast({ type: 'users_updated', users: getUsers() });
       broadcast({ type: 'orders_updated', orders: getOrders() });
       broadcast({ type: 'stats_updated', stats: getStats() });
     }
 
-    // ── Getränkekarte aktualisieren ─────────────────────────────
     if (msg.type === 'update_drinks') {
       const upsert = db.prepare(`
         INSERT INTO drinks (id, name, emoji) VALUES (?, ?, ?)
@@ -272,11 +263,9 @@ wss.on('connection', ws => {
       broadcast({ type: 'drinks_updated', drinks: getDrinks() });
     }
   });
-
-  ws.on('close', () => console.log('Browser getrennt'));
 });
 
 // ─── Server starten ─────────────────────────────────────────────
 httpServer.listen(PORT, () => {
-  console.log(`Server läuft auf Port ${PORT}`);
+  console.log(`Server läuft auf Port ${PORT} mit datenbank2.db`);
 });
